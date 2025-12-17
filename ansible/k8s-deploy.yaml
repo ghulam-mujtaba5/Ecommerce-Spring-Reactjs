@@ -1,0 +1,128 @@
+# =============================================================================
+# Kubernetes Deployment Playbook
+# =============================================================================
+---
+- name: Deploy E-Commerce to Kubernetes
+  hosts: localhost
+  connection: local
+  vars:
+    kubeconfig_path: "~/.kube/config"
+    namespace: "ecommerce-dev"
+    manifests_path: "../k8s"
+
+  tasks:
+    # ==========================================================================
+    # Prerequisites Check
+    # ==========================================================================
+    - name: Check if kubectl is installed
+      command: kubectl version --client
+      register: kubectl_check
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Fail if kubectl is not installed
+      fail:
+        msg: "kubectl is not installed. Please install kubectl first."
+      when: kubectl_check.rc != 0
+
+    # ==========================================================================
+    # Namespace Setup
+    # ==========================================================================
+    - name: Create namespaces
+      kubernetes.core.k8s:
+        src: "{{ manifests_path }}/namespace.yaml"
+        state: present
+
+    # ==========================================================================
+    # Deploy ConfigMaps and Secrets
+    # ==========================================================================
+    - name: Deploy ConfigMap
+      kubernetes.core.k8s:
+        src: "{{ manifests_path }}/configmap.yaml"
+        state: present
+
+    - name: Deploy Secrets
+      kubernetes.core.k8s:
+        src: "{{ manifests_path }}/secret.yaml"
+        state: present
+
+    # ==========================================================================
+    # Deploy Database
+    # ==========================================================================
+    - name: Deploy PostgreSQL
+      kubernetes.core.k8s:
+        src: "{{ manifests_path }}/postgres-deployment.yaml"
+        state: present
+
+    - name: Wait for PostgreSQL to be ready
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ namespace }}"
+        label_selectors:
+          - app=postgres
+      register: postgres_pods
+      until: postgres_pods.resources[0].status.phase == "Running"
+      retries: 30
+      delay: 10
+
+    # ==========================================================================
+    # Deploy Redis Cache
+    # ==========================================================================
+    - name: Deploy Redis
+      kubernetes.core.k8s:
+        src: "{{ manifests_path }}/redis-deployment.yaml"
+        state: present
+
+    # ==========================================================================
+    # Deploy Application
+    # ==========================================================================
+    - name: Deploy Backend
+      kubernetes.core.k8s:
+        src: "{{ manifests_path }}/backend-deployment.yaml"
+        state: present
+
+    - name: Deploy Frontend
+      kubernetes.core.k8s:
+        src: "{{ manifests_path }}/frontend-deployment.yaml"
+        state: present
+
+    # ==========================================================================
+    # Deploy Ingress
+    # ==========================================================================
+    - name: Deploy Ingress
+      kubernetes.core.k8s:
+        src: "{{ manifests_path }}/ingress.yaml"
+        state: present
+
+    # ==========================================================================
+    # Deploy HPA
+    # ==========================================================================
+    - name: Deploy Horizontal Pod Autoscalers
+      kubernetes.core.k8s:
+        src: "{{ manifests_path }}/hpa.yaml"
+        state: present
+
+    # ==========================================================================
+    # Verification
+    # ==========================================================================
+    - name: Get all pods in namespace
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ namespace }}"
+      register: all_pods
+
+    - name: Get all services in namespace
+      kubernetes.core.k8s_info:
+        kind: Service
+        namespace: "{{ namespace }}"
+      register: all_services
+
+    - name: Display deployment status
+      debug:
+        msg: |
+          ==========================================
+          Kubernetes Deployment Complete!
+          ==========================================
+          Pods: {{ all_pods.resources | length }}
+          Services: {{ all_services.resources | length }}
+          ==========================================

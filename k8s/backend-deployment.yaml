@@ -1,0 +1,116 @@
+# =============================================================================
+# Backend Deployment - Spring Boot Application
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ecommerce-backend
+  namespace: ecommerce-dev
+  labels:
+    app: ecommerce-backend
+    tier: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ecommerce-backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: ecommerce-backend
+        tier: backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5000"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      containers:
+        - name: backend
+          image: mujtaba0101/ecom-backend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5000
+              name: http
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              valueFrom:
+                configMapKeyRef:
+                  name: ecommerce-config
+                  key: SPRING_PROFILES_ACTIVE
+            - name: SERVER_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: ecommerce-config
+                  key: SERVER_PORT
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres:5432/ecommerce"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: ecommerce-secrets
+                  key: SPRING_DATASOURCE_USERNAME
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ecommerce-secrets
+                  key: SPRING_DATASOURCE_PASSWORD
+            - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+              valueFrom:
+                configMapKeyRef:
+                  name: ecommerce-config
+                  key: SPRING_JPA_HIBERNATE_DDL_AUTO
+            - name: SPRING_APP_JWTSECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ecommerce-secrets
+                  key: SPRING_APP_JWTSECRET
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 5000
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 5000
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+      imagePullSecrets:
+        - name: docker-registry-secret
+---
+# =============================================================================
+# Backend Service
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: ecommerce-backend
+  namespace: ecommerce-dev
+  labels:
+    app: ecommerce-backend
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5000
+      targetPort: 5000
+      protocol: TCP
+      name: http
+  selector:
+    app: ecommerce-backend

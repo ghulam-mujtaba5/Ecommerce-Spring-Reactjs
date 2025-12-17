@@ -1,0 +1,19 @@
+# =============================================================================
+# Kubernetes Namespace Configuration
+# E-Commerce Application - Group-16
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ecommerce-dev
+  labels:
+    app: ecommerce
+    environment: dev
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ecommerce-prod
+  labels:
+    app: ecommerce
+    environment: prod

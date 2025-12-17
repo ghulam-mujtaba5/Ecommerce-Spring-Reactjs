@@ -1,0 +1,25 @@
+# =============================================================================
+# Kubernetes ConfigMap - Application Configuration
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ecommerce-config
+  namespace: ecommerce-dev
+  labels:
+    app: ecommerce
+data:
+  # Backend Configuration
+  SPRING_PROFILES_ACTIVE: "prod"
+  SERVER_PORT: "5000"
+  SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
+  SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: "org.hibernate.dialect.PostgreSQLDialect"
+  LOGGING_LEVEL_ROOT: "INFO"
+  LOGGING_LEVEL_COM_JIANQUANWANG_ECOMMERCE: "INFO"
+  
+  # Frontend Configuration
+  VITE_BACK_END_URL: "http://ecommerce-backend:5000"
+  
+  # Database Configuration (non-sensitive)
+  POSTGRES_DB: "ecommerce"
+  DB_PORT: "5432"
